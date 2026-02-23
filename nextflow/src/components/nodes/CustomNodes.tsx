@@ -194,10 +194,50 @@ export function UploadVideoNode({ id, data, selected }: any) {
 
 export function LLMNode({ id, data, selected }: any) {
   const updateNode = useWorkflowStore((s) => s.updateNode);
+  const setRunState = useWorkflowStore((s) => s.setRunState);
   const nodeStatus: import('@/store/useWorkflowStore').RunStatus = useWorkflowStore((s) => s.runState[id] || 'idle');
+
   const handleModelChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     updateNode(id, { model: e.target.value });
   }, [id, updateNode]);
+
+  const handleRun = useCallback(async () => {
+    setRunState(id, 'running');
+    updateNode(id, { result: '' });
+    try {
+      const res = await fetch('/api/run-llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: data.model || 'gemini-2.0-flash',
+          userMessage: data.user_message || 'Hello',
+          systemPrompt: data.system_prompt,
+          temperature: data.temperature ?? 0.7,
+        }),
+      });
+      const { id: runId, error } = await res.json();
+      if (error) throw new Error(error);
+
+      // poll for result
+      const poll = setInterval(async () => {
+        const statusRes = await fetch(`/api/run-status?id=${runId}`);
+        const run = await statusRes.json();
+        if (run.status === 'COMPLETED') {
+          clearInterval(poll);
+          setRunState(id, 'success');
+          updateNode(id, { result: run.output?.text || 'Done' });
+        } else if (run.status === 'FAILED' || run.status === 'CRASHED') {
+          clearInterval(poll);
+          setRunState(id, 'failed');
+          updateNode(id, { result: run.output?.error || 'Task failed' });
+        }
+      }, 2000);
+    } catch (err: any) {
+      setRunState(id, 'failed');
+      updateNode(id, { result: err.message });
+    }
+  }, [id, data, setRunState, updateNode]);
+
   const statusConfig = {
     idle: { color: 'text-zinc-500', icon: null },
     queued: { color: 'text-yellow-400', icon: <Loader2 className="w-3 h-3 animate-spin" /> },
@@ -243,9 +283,7 @@ export function LLMNode({ id, data, selected }: any) {
           </div>
           <input 
             type="range" 
-            min="0" 
-            max="2" 
-            step="0.1"
+            min="0" max="2" step="0.1"
             value={data.temperature ?? 0.7}
             onChange={(e) => updateNode(id, { temperature: parseFloat(e.target.value) })}
             className="w-full h-1 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-purple-500"
@@ -263,8 +301,10 @@ export function LLMNode({ id, data, selected }: any) {
             </span>
           </div>
         </div>
-        <button className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
+        <button 
+          className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
           disabled={nodeStatus === 'running'}
+          onClick={handleRun}
         >
           {nodeStatus === 'running' ? (
             <>
