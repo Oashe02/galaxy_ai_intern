@@ -141,7 +141,14 @@ export function Navbar() {
             <Link href="/workflow" className="px-4 py-2 text-[14px] font-medium text-white/70 hover:text-white transition-colors mr-2">
               Dashboard
             </Link>
-            <UserButton afterSignOutUrl="/" />
+            <UserButton 
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: "w-9 h-9 ring-2 ring-white/20 hover:ring-white/40 transition-all",
+                }
+              }}
+            />
           </SignedIn>
         </ClerkLoaded>
         <ClerkLoading>

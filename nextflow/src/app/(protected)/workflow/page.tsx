@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import WorkflowCanvas from '@/components/canvas/WorkflowCanvas';
-import { useWorkflowStore } from '@/store/useWorkflowStore';
+import { useWorkflowStore, type LogEntry } from '@/store/useWorkflowStore';
 import { 
   Search, Play, History, Type, Image as ImageIcon, Video, Layers, Settings, 
   Crop, Share2, Plus, SlidersHorizontal, Maximize2, Sparkles, 
-  Box, Workflow, Wand2, Scissors, Home, ImagePlus, Pen, Film, Zap,
-  MousePointer, Maximize
+  Box, Workflow, Wand2, Scissors, Home, Pen, Film, Zap
 } from 'lucide-react';
 import { ReactFlowProvider } from '@xyflow/react';
 import Link from 'next/link';
@@ -26,7 +25,14 @@ type View = 'dashboard' | 'canvas';
 export default function WorkflowPage() {
   const [view, setView] = useState<View>('dashboard');
   const [prompt, setPrompt] = useState('');
-  const addNode = useWorkflowStore((state) => state.addNode);
+  const addNode = useWorkflowStore(s => s.addNode);
+  const wfMeta = useWorkflowStore(s => s.meta);
+  const renameFn = useWorkflowStore(s => s.rename);
+  const nodes = useWorkflowStore(s => s.nodes);
+  const edges = useWorkflowStore(s => s.edges);
+  const isRunning = useWorkflowStore(s => s.running);
+  const logs = useWorkflowStore(s => s.logs);
+  const clearLogs = useWorkflowStore(s => s.clearLogs);
 
   const handleAddNode = (nodeName: string, type: string) => {
     const id = `${type}-${Date.now()}`;
@@ -90,29 +96,36 @@ export default function WorkflowPage() {
           <main className="flex-1 relative flex flex-col">
             <div className="h-12 border-b border-zinc-900 bg-[#050505] flex items-center justify-between px-4 z-10">
               <div className="flex items-center gap-4">
-                <h2 className="text-sm font-semibold tracking-tight text-zinc-200">Untitled Workflow</h2>
+                <input
+                  type="text"
+                  value={wfMeta.name}
+                  onChange={(e) => renameFn(e.target.value)}
+                  className="text-sm font-semibold tracking-tight text-zinc-200 bg-transparent border-none outline-none focus:ring-1 focus:ring-purple-500 rounded px-1 -ml-1 max-w-[200px]"
+                />
                 <div className="h-4 w-px bg-zinc-800" />
-                <span className="text-[11px] text-zinc-500 font-medium bg-zinc-900/50 px-2 py-0.5 rounded border border-zinc-800">Draft</span>
+                <span className={`text-[11px] font-medium px-2 py-0.5 rounded border ${
+                  wfMeta.status === 'running' ? 'text-purple-400 bg-purple-500/10 border-purple-500/30' :
+                  wfMeta.status === 'done' ? 'text-green-400 bg-green-500/10 border-green-500/30' :
+                  wfMeta.status === 'error' ? 'text-red-400 bg-red-500/10 border-red-500/30' :
+                  'text-zinc-500 bg-zinc-900/50 border-zinc-800'
+                }`}>
+                  {wfMeta.status.charAt(0).toUpperCase() + wfMeta.status.slice(1)}
+                </span>
+                <span className="text-[10px] text-zinc-600">{nodes.length} nodes • {edges.length} edges</span>
               </div>
               
               <div className="flex items-center gap-3">
-                <button className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-purple-500/10 active:scale-95">
+                <button 
+                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-purple-500/10 active:scale-95 disabled:opacity-50"
+                  disabled={isRunning || nodes.length === 0}
+                >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  Run Workflow
+                  {isRunning ? 'Running...' : 'Run Workflow'}
                 </button>
                 <button className="p-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-full transition-colors">
                   <Settings className="w-4 h-4 text-zinc-400" />
                 </button>
               </div>
-            </div>
-
-            <div className="h-10 border-b border-zinc-900 bg-[#050505] flex items-center px-4 gap-2">
-              <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
-                <MousePointer className="w-3.5 h-3.5" /> Select
-              </button>
-              <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
-                <Maximize className="w-3.5 h-3.5" /> Fit View
-              </button>
             </div>
 
             <div className="flex-1">
@@ -126,18 +139,49 @@ export default function WorkflowPage() {
                 <History className="w-3.5 h-3.5 text-purple-400" />
                 Workflow History
               </h3>
+              {logs.length > 0 && (
+                <button 
+                  onClick={clearLogs}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4">
-                  <History className="w-6 h-6 text-zinc-700" />
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {logs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4">
+                    <History className="w-6 h-6 text-zinc-700" />
+                  </div>
+                  <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">No history yet</p>
+                  <p className="text-[10px] max-w-[180px] mt-2 text-zinc-600 leading-relaxed font-medium">
+                    Executions will appear here after you run your workflow.
+                  </p>
                 </div>
-                <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">No history yet</p>
-                <p className="text-[10px] max-w-[180px] mt-2 text-zinc-600 leading-relaxed font-medium">
-                  Executions will appear here after you run your workflow.
-                </p>
-              </div>
+              ) : (
+                logs.map((log: LogEntry) => (
+                  <div key={log.id} className="p-2.5 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-zinc-300">{log.name}</span>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                        log.status === 'success' ? 'text-green-400' :
+                        log.status === 'failed' ? 'text-red-400' :
+                        log.status === 'running' ? 'text-purple-400' :
+                        'text-zinc-500'
+                      }`}>{log.status}</span>
+                    </div>
+                    <span className="text-[10px] text-zinc-600">
+                      {new Date(log.ts).toLocaleTimeString()}
+                      {log.ms ? ` • ${log.ms}ms` : ''}
+                    </span>
+                    {log.err && (
+                      <p className="text-[10px] text-red-400 mt-1 truncate">{log.err}</p>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </aside>
         </div>
@@ -173,7 +217,7 @@ export default function WorkflowPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-[900px] mx-auto px-8 pt-16 pb-20">
+      <div className="max-w-7xl mx-auto px-10 pt-16 pb-20">
         <h2 className="text-center text-xl md:text-2xl font-medium text-white mb-12 tracking-tight">
           What do you want to create today?
         </h2>
@@ -209,12 +253,10 @@ export default function WorkflowPage() {
           </div>
         </div>
 
-        {/* Feature Grid + Latest Features */}
-        <div className="mt-16 flex gap-12">
-          {/* Left Column — Generate & Edit */}
-          <div className="flex-1 min-w-0">
+        <div className="mt-16 flex gap-0">
+          <div className="flex-1 min-w-0 max-w-4xl">
             <h3 className="text-base font-semibold text-white mb-6 tracking-tight">Generate</h3>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
               <FeatureItem icon={<ImageIcon className="w-5 h-5" />} label="Image" color="bg-blue-500" />
               <FeatureItem icon={<Video className="w-5 h-5" />} label="Video" color="bg-red-500" />
               <FeatureItem icon={<Sparkles className="w-5 h-5" />} label="Realtime" color="bg-teal-500" badge="NEW" />
@@ -229,7 +271,7 @@ export default function WorkflowPage() {
             </div>
 
             <h3 className="text-base font-semibold text-white mt-12 mb-6 tracking-tight">Edit</h3>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
               <FeatureItem icon={<Wand2 className="w-5 h-5" />} label="Enhancer" color="bg-purple-500" />
               <FeatureItem icon={<Pen className="w-5 h-5" />} label="Edit" color="bg-amber-500" />
               <FeatureItem icon={<Film className="w-5 h-5" />} label="Video Lipsync" color="bg-green-500" />
@@ -237,9 +279,8 @@ export default function WorkflowPage() {
             </div>
           </div>
 
-          {/* Right Column — Latest Features */}
-          <div className="hidden md:block w-48 shrink-0">
-            <h3 className="text-base font-semibold text-white mb-6 tracking-tight">Latest features</h3>
+          <div className="hidden md:block w-80 shrink-0">
+            <h1 className="text-xl font-semibold text-white mb-6 tracking-tight">Latest features</h1>
             <div className="space-y-4">
               <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-900/50 group cursor-pointer hover:border-white/20 transition-colors">
                 <div className="aspect-[4/3] bg-gradient-to-br from-zinc-800 to-zinc-900 relative">
