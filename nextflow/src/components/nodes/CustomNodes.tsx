@@ -101,8 +101,9 @@ export function UploadImageNode({ id, data, selected }: any) {
           </div>
         ) : (
           <div 
-            onClick={() => fileInputRef.current?.click()}
-            className="h-32 bg-zinc-950 border border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center gap-2 group/upload cursor-pointer hover:border-green-500/50 transition-colors"
+            onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="nodrag nopan h-32 bg-zinc-950 border border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center gap-2 group/upload cursor-pointer hover:border-green-500/50 transition-colors"
           >
             <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 group-hover/upload:bg-zinc-800 group-hover/upload:border-green-500/30 transition-all">
               <Upload className="w-4 h-4 text-zinc-500 group-hover/upload:text-green-400 transition-colors" />
@@ -183,8 +184,9 @@ export function UploadVideoNode({ id, data, selected }: any) {
           </div>
         ) : (
           <div 
-            onClick={() => fileInputRef.current?.click()}
-            className="h-32 bg-zinc-950 border border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center gap-2 group/upload cursor-pointer hover:border-red-500/50 transition-colors"
+            onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="nodrag nopan h-32 bg-zinc-950 border border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center gap-2 group/upload cursor-pointer hover:border-red-500/50 transition-colors"
           >
             <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 group-hover/upload:bg-zinc-800 group-hover/upload:border-red-500/30 transition-all">
               <Film className="w-4 h-4 text-zinc-500 group-hover/upload:text-red-400 transition-colors" />

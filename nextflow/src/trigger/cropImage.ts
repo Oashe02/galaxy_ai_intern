@@ -11,9 +11,26 @@ export const cropImageTask = task({
         h: number;
     }) => {
         const { imageUrl, x, y, w, h } = payload;
-        const imgRes = await fetch(imageUrl);
-        if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`);
-        const buf = Buffer.from(await imgRes.arrayBuffer());
+
+        if (!imageUrl) {
+            throw new Error("No image provided");
+        }
+
+        let buf: Buffer;
+
+        // Handle base64 data URLs directly (from browser FileReader)
+        if (imageUrl.startsWith("data:")) {
+            const base64Data = imageUrl.replace(/^data:image\/\w+;base64,/, "");
+            buf = Buffer.from(base64Data, "base64");
+        } else if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+            // Only fetch real HTTP URLs
+            const imgRes = await fetch(imageUrl);
+            if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`);
+            buf = Buffer.from(await imgRes.arrayBuffer());
+        } else {
+            throw new Error("Invalid image URL. Must be a data URL or HTTP URL.");
+        }
+
         let sharp: typeof import("sharp");
         try {
             sharp = (await import("sharp")).default;
@@ -24,6 +41,11 @@ export const cropImageTask = task({
         const meta = await sharp(buf).metadata();
         const imgW = meta.width ?? 0;
         const imgH = meta.height ?? 0;
+
+        if (imgW === 0 || imgH === 0) {
+            throw new Error("Could not read image dimensions");
+        }
+
         const cropX = Math.round((x / 100) * imgW);
         const cropY = Math.round((y / 100) * imgH);
         const cropW = Math.round((w / 100) * imgW);

@@ -29,12 +29,30 @@ model WorkflowRun {
   workflowId String
   userId     String   // Clerk user ID
   status     String   // success, failed, partial
-  runType    String   // full, single, partial
-  duration   Int      // in ms
-  nodes      Json     // Array of node execution results
+  scope      String   // full, single, partial
+  duration   Int?     // in ms
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  nodeRuns   NodeRun[]
 
   @@index([workflowId])
   @@index([userId])
+}
+
+model NodeRun {
+  id            String      @id @default(uuid())
+  workflowRunId String
+  nodeId        String      // The React Flow node ID
+  nodeType      String
+  status        String      // success, failed, running
+  duration      Int?        // in ms
+  inputs        Json?
+  outputs       Json?
+  error         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+  @@index([workflowRunId])
 }

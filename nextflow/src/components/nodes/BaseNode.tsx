@@ -42,7 +42,7 @@ export function BaseNode({
       </div>
 
       {/* Node Content */}
-      <div className="p-3">
+      <div className="p-3 nodrag nopan">
         {children}
       </div>
 
