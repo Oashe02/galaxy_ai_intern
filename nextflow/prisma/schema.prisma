@@ -29,10 +29,10 @@ model WorkflowRun {
   workflowId String
   userId     String   // Clerk user ID
   status     String   // success, failed, partial
-  scope      String   // full, single, partial
+  scope      String   @default("full") // full, single, partial
   duration   Int?     // in ms
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime @default(now()) @updatedAt
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   nodeRuns   NodeRun[]
 

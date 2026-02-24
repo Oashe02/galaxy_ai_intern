@@ -125,16 +125,44 @@ export default function WorkflowPage() {
   };
 
   // === DAG Execution Handlers ===
+  const autoSaveBeforeRun = async (): Promise<string | undefined> => {
+    let wfId = wfMeta.id;
+    if (wfId.startsWith('wf-')) {
+      try {
+        const cleanNodes = nodes.map((n) => {
+          const d = { ...n.data };
+          if (typeof d.imageUrl === 'string' && d.imageUrl.startsWith('data:')) { d.imageUrl = null; d.hadImage = true; }
+          if (typeof d.videoUrl === 'string' && d.videoUrl.startsWith('data:')) { d.videoUrl = null; d.hadVideo = true; }
+          if (typeof d.result === 'string' && d.result.startsWith('data:')) { d.result = null; d.hadResult = true; }
+          return { ...n, data: d };
+        });
+        const res = await fetch('/api/workflows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: wfMeta.name, desc: wfMeta.desc, nodes: cleanNodes, edges }),
+        });
+        const data = await res.json();
+        if (data.workflow) {
+          patchMeta({ id: data.workflow.id, status: 'saved' });
+          wfId = data.workflow.id;
+        }
+      } catch (err) {
+        console.error('Failed to auto-save workflow prior to run:', err);
+      }
+    }
+    return wfId.startsWith('wf-') ? undefined : wfId;
+  };
+
   const handleRunWorkflow = useCallback(async () => {
     if (nodes.length === 0) return;
     const result = await runDAG(nodes, edges, 'full');
-    // Record to DB
-    const wfId = wfMeta.id.startsWith('wf-') ? undefined : wfMeta.id;
+    // Auto record to DB
+    const wfId = await autoSaveBeforeRun();
     if (wfId) {
       await recordRunHistory(wfId, result);
       refreshHistory();
     }
-  }, [nodes, edges, wfMeta.id, refreshHistory]);
+  }, [nodes, edges, wfMeta, patchMeta, refreshHistory]);
 
   const handleRunSelected = useCallback(async () => {
     const selectedNodes = nodes.filter(n => selected.includes(n.id));
@@ -142,12 +170,13 @@ export default function WorkflowPage() {
     if (selectedNodes.length === 0) return;
     const scope = selectedNodes.length === 1 ? 'single' : 'partial';
     const result = await runDAG(selectedNodes, relevantEdges, scope);
-    const wfId = wfMeta.id.startsWith('wf-') ? undefined : wfMeta.id;
+    
+    const wfId = await autoSaveBeforeRun();
     if (wfId) {
       await recordRunHistory(wfId, result);
       refreshHistory();
     }
-  }, [nodes, edges, selected, wfMeta.id, refreshHistory]);
+  }, [nodes, edges, selected, wfMeta, patchMeta, refreshHistory]);
 
   // === Export / Import JSON ===
   const handleExport = useCallback(() => {
@@ -381,11 +410,11 @@ export default function WorkflowPage() {
                         const statusIcon = run.status === 'success' ? <CheckCircle2 className="w-3 h-3 text-green-400" /> :
                                           run.status === 'failed' ? <XCircle className="w-3 h-3 text-red-400" /> :
                                           <AlertTriangle className="w-3 h-3 text-yellow-400" />;
-                        const scopeLabel = run.runType === 'full' ? 'Full Workflow' :
-                                          run.runType === 'single' ? 'Single Node' :
-                                          `${(run.nodes as any[])?.length || 0} nodes selected`;
+                        const scopeLabel = run.scope === 'full' ? 'Full Workflow' :
+                                          run.scope === 'single' ? 'Single Node' :
+                                          `Partial Workflow (${(run.nodeRuns as any[])?.length || 0} nodes)`;
                         return (
-                          <div key={run.id} className="border border-zinc-800 rounded-lg mb-2 overflow-hidden">
+                          <div key={run.id} className="border border-zinc-800 rounded-lg mb-2 overflow-hidden bg-zinc-950/20">
                             <button
                               onClick={() => setExpandedRun(isExpanded ? null : run.id)}
                               className="w-full p-2.5 flex items-center justify-between hover:bg-zinc-900/50 transition-colors"
@@ -393,8 +422,13 @@ export default function WorkflowPage() {
                               <div className="flex items-center gap-2">
                                 {statusIcon}
                                 <div className="text-left">
-                                  <p className="text-[11px] font-medium text-zinc-300">{scopeLabel}</p>
-                                  <p className="text-[9px] text-zinc-600 flex items-center gap-1">
+                                  <p className="text-[11px] font-medium text-zinc-300 flex leading-none gap-2">
+                                    {scopeLabel} 
+                                    {run.status === 'partial' && (
+                                      <span className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 text-[8px] px-1 py-0.5 rounded uppercase tracking-wider">Partial Fail</span>
+                                    )}
+                                  </p>
+                                  <p className="text-[9px] text-zinc-600 flex items-center gap-1 mt-1">
                                     <Clock className="w-2.5 h-2.5" />
                                     {new Date(run.createdAt).toLocaleString()}
                                     {' • '}{(run.duration / 1000).toFixed(1)}s
@@ -404,16 +438,29 @@ export default function WorkflowPage() {
                               {isExpanded ? <ChevronDown className="w-3 h-3 text-zinc-500" /> : <ChevronRight className="w-3 h-3 text-zinc-500" />}
                             </button>
                             {isExpanded && (
-                              <div className="px-2.5 pb-2.5 space-y-1.5 border-t border-zinc-800 pt-2">
-                                {(run.nodes as any[])?.map((nr: any, i: number) => (
-                                  <div key={i} className="flex items-center justify-between p-2 bg-zinc-950 rounded-md">
-                                    <div className="flex items-center gap-2">
-                                      {nr.status === 'success' ? <CheckCircle2 className="w-2.5 h-2.5 text-green-500" /> : <XCircle className="w-2.5 h-2.5 text-red-500" />}
-                                      <span className="text-[10px] text-zinc-300 font-medium">{nr.name}</span>
+                              <div className="bg-zinc-950/50 flex flex-col gap-1 p-2 pt-0">
+                                <div className="h-px bg-zinc-800/50 mb-1" />
+                                {(run.nodeRuns as any[])?.map((nr: any, i: number) => (
+                                  <div key={i} className="flex flex-col p-1.5 rounded-md hover:bg-zinc-900/50 border border-transparent hover:border-zinc-800 transition-colors">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        {nr.status === 'success' ? <CheckCircle2 className="w-2.5 h-2.5 text-green-500" /> : <XCircle className="w-2.5 h-2.5 text-red-500" />}
+                                        <span className={`text-[10px] font-medium ${nr.status === 'success' ? 'text-zinc-300' : 'text-red-400'}`}>
+                                          {nr.nodeType || nr.nodeId}
+                                        </span>
+                                      </div>
+                                      <span className="text-[9px] text-zinc-600 font-mono">{(nr.duration / 1000).toFixed(1)}s</span>
                                     </div>
-                                    <span className="text-[9px] text-zinc-600 font-mono">{(nr.ms / 1000).toFixed(1)}s</span>
+                                    {nr.status === 'failed' && nr.error && (
+                                      <div className="mt-1 ml-4.5 text-[9px] text-red-400/80 bg-red-400/10 rounded p-1.5 border border-red-500/10">
+                                        {nr.error}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
+                                {(!run.nodeRuns || run.nodeRuns.length === 0) && (
+                                  <div className="text-[9px] text-zinc-600 text-center py-2 italic transition">No node data recorded</div>
+                                )}
                               </div>
                             )}
                           </div>

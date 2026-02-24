@@ -17,6 +17,9 @@ export async function GET(req: NextRequest) {
                 userId,
                 ...(workflowId ? { workflowId } : {})
             },
+            include: {
+                nodeRuns: true
+            },
             orderBy: { createdAt: 'desc' }
         });
 
@@ -35,20 +38,35 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { workflowId, status, runType, duration, nodes } = body;
+        // `runType` comes from old `recordRunHistory` payload, fallback to mapping it to `scope`
+        const { workflowId, status, runType, scope, duration, nodes } = body;
 
         if (!workflowId) {
             return NextResponse.json({ error: "workflowId required" }, { status: 400 });
         }
+
+        const runScope = scope || runType || 'full';
 
         const newRun = await prisma.workflowRun.create({
             data: {
                 userId,
                 workflowId,
                 status: status || 'success',
-                runType: runType || 'full',
+                scope: runScope,
                 duration: duration || 0,
-                nodes: nodes || []
+                nodeRuns: {
+                    create: (nodes || []).map((n: any) => ({
+                        nodeId: n.nodeId,
+                        nodeType: n.name, // The task is using `name` for type/label representation loosely
+                        status: n.status,
+                        duration: n.ms,
+                        outputs: n.output ? { result: n.output } : null,
+                        error: n.error || null
+                    }))
+                }
+            },
+            include: {
+                nodeRuns: true
             }
         });
 
