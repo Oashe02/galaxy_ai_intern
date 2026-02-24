@@ -45,6 +45,7 @@ export default function WorkflowPage() {
 
   const setNodes = useWorkflowStore(s => s.setNodes);
   const setEdges = useWorkflowStore(s => s.setEdges);
+  const nuke = useWorkflowStore(s => s.nuke);
   const pushLog = useWorkflowStore(s => s.pushLog);
 
   // Persistent history from DB
@@ -99,23 +100,6 @@ export default function WorkflowPage() {
   const handleSaveWorkflow = async () => {
     setIsSaving(true);
     try {
-      const cleanNodes = nodes.map((n: any) => {
-        const d = { ...n.data };
-        if (d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('data:')) {
-          d.imageUrl = null;
-          d.hadImage = true;
-        }
-        if (d.videoUrl && typeof d.videoUrl === 'string' && d.videoUrl.startsWith('data:')) {
-          d.videoUrl = null;
-          d.hadVideo = true;
-        }
-        if (d.result && typeof d.result === 'string' && d.result.startsWith('data:')) {
-          d.result = null;
-          d.hadResult = true;
-        }
-        return { ...n, data: d };
-      });
-
       const res = await fetch('/api/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +107,7 @@ export default function WorkflowPage() {
           id: wfMeta.id.startsWith('wf-') ? undefined : wfMeta.id,
           name: wfMeta.name,
           desc: wfMeta.desc,
-          nodes: cleanNodes,
+          nodes,
           edges,
         })
       });
@@ -141,28 +125,26 @@ export default function WorkflowPage() {
   // === DAG Execution Handlers ===
   const autoSaveBeforeRun = async (): Promise<string | undefined> => {
     let wfId = wfMeta.id;
-    if (wfId.startsWith('wf-')) {
-      try {
-        const cleanNodes = nodes.map((n) => {
-          const d = { ...n.data };
-          if (typeof d.imageUrl === 'string' && d.imageUrl.startsWith('data:')) { d.imageUrl = null; d.hadImage = true; }
-          if (typeof d.videoUrl === 'string' && d.videoUrl.startsWith('data:')) { d.videoUrl = null; d.hadVideo = true; }
-          if (typeof d.result === 'string' && d.result.startsWith('data:')) { d.result = null; d.hadResult = true; }
-          return { ...n, data: d };
-        });
-        const res = await fetch('/api/workflows', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: wfMeta.name, desc: wfMeta.desc, nodes: cleanNodes, edges }),
-        });
-        const data = await res.json();
-        if (data.workflow) {
-          patchMeta({ id: data.workflow.id, status: 'saved' });
-          wfId = data.workflow.id;
-        }
-      } catch (err) {
-        console.error('Failed to auto-save workflow prior to run:', err);
+    try {
+      const isDraft = wfId.startsWith('wf-');
+      const res = await fetch('/api/workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: isDraft ? undefined : wfId,
+          name: wfMeta.name, 
+          desc: wfMeta.desc, 
+          nodes, 
+          edges 
+        }),
+      });
+      const data = await res.json();
+      if (data.workflow) {
+        if (isDraft) patchMeta({ id: data.workflow.id, status: 'saved' });
+        wfId = data.workflow.id;
       }
+    } catch (err) {
+      console.error('Failed to auto-save workflow prior to run:', err);
     }
     return wfId.startsWith('wf-') ? undefined : wfId;
   };
@@ -336,8 +318,15 @@ export default function WorkflowPage() {
                 </span>
                 <span className="text-[10px] text-zinc-600">{nodes.length} nodes • {edges.length} edges</span>
               </div>
-              
               <div className="flex items-center gap-2">
+                <button 
+                  onClick={nuke}
+                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 rounded-lg text-xs font-bold transition-all flex items-center gap-2"
+                  title="Create New Workflow"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  New
+                </button>
                 <button 
                   onClick={handleExport}
                   className="p-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-full transition-colors"
