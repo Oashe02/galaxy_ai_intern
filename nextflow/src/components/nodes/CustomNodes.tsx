@@ -365,9 +365,11 @@ export function LLMNode({ id, data, selected }: any) {
               </div>
             )}
           </div>
-          <div className="min-h-[60px] bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-zinc-400">
+          <div className="min-h-[60px] max-h-60 overflow-y-auto bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-zinc-400 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-zinc-800 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
             {data.result ? (
-              <p className="text-zinc-300 leading-relaxed">{data.result}</p>
+              <div className="text-zinc-300 leading-relaxed whitespace-pre-wrap select-text pr-2 py-1">
+                {data.result}
+              </div>
             ) : (
               <p className="text-zinc-700 italic text-[10px]">Output will appear here after execution...</p>
             )}

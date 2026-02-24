@@ -62,6 +62,20 @@ export default function WorkflowPage() {
            patchMeta({ id: latestWf.id, name: latestWf.name, desc: latestWf.desc || '', status: 'saved' });
            setNodes(latestWf.nodes || []);
            setEdges(latestWf.edges || []);
+        } else {
+           patchMeta({ id: 'wf-default', name: 'Marketing Campaign Builder', desc: 'Auto-generated marketing flow', status: 'draft' });
+           setNodes([
+             { id: 'text-brand', type: 'text', position: { x: 50, y: 100 }, data: { label: 'Brand Voice / Guidelines', text: 'We are a luxury, eco-friendly coffee brand. Tone: sophisticated, punchy, and energetic.' } },
+             { id: 'img-product', type: 'uploadImage', position: { x: 50, y: 350 }, data: { label: 'Product Photo' } },
+             { id: 'llm-insta', type: 'llm', position: { x: 450, y: 50 }, data: { label: 'Instagram Caption', model: 'gemini-2.0-flash', temperature: 0.8, user_message: 'Generate a highly engaging Instagram caption for this product photo with hashtags.' } },
+             { id: 'llm-tweet', type: 'llm', position: { x: 450, y: 450 }, data: { label: 'Twitter Post', model: 'gemini-1.5-pro', temperature: 0.6, user_message: 'Write a short, engaging Twitter post about the eco-friendly aspects of this product.' } },
+           ]);
+           setEdges([
+             { id: 'e1', source: 'text-brand', target: 'llm-insta', sourceHandle: 'text', targetHandle: 'system_prompt', animated: true },
+             { id: 'e2', source: 'img-product', target: 'llm-insta', sourceHandle: 'image', targetHandle: 'images', animated: true },
+             { id: 'e3', source: 'text-brand', target: 'llm-tweet', sourceHandle: 'text', targetHandle: 'system_prompt', animated: true },
+             { id: 'e4', source: 'img-product', target: 'llm-tweet', sourceHandle: 'image', targetHandle: 'images', animated: true },
+           ]);
         }
 
         const hRes = await fetch('/api/history');
@@ -84,7 +98,6 @@ export default function WorkflowPage() {
   const handleSaveWorkflow = async () => {
     setIsSaving(true);
     try {
-      // Strip base64 binary data before sending to avoid body size limits
       const cleanNodes = nodes.map((n: any) => {
         const d = { ...n.data };
         if (d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('data:')) {
