@@ -65,18 +65,38 @@ export default function WorkflowPage() {
            setNodes(latestWf.nodes || []);
            setEdges(latestWf.edges || []);
         } else {
-           patchMeta({ id: 'wf-default', name: 'Marketing Campaign Builder', desc: 'Auto-generated marketing flow', status: 'draft' });
+           patchMeta({ id: 'wf-default', name: 'Product Marketing Kit Generator', desc: 'Auto-generated multimodal flow demonstrating parallel node execution', status: 'draft' });
            setNodes([
-             { id: 'text-brand', type: 'text', position: { x: 50, y: 100 }, data: { label: 'Brand Voice / Guidelines', text: 'We are a luxury, eco-friendly coffee brand. Tone: sophisticated, punchy, and energetic.' } },
-             { id: 'img-product', type: 'uploadImage', position: { x: 50, y: 350 }, data: { label: 'Product Photo' } },
-             { id: 'llm-insta', type: 'llm', position: { x: 450, y: 50 }, data: { label: 'Instagram Caption', model: 'gemini-1.5-flash', temperature: 0.8, user_message: 'Generate a highly engaging Instagram caption for this product photo with hashtags.' } },
-             { id: 'llm-tweet', type: 'llm', position: { x: 450, y: 450 }, data: { label: 'Twitter Post', model: 'gemini-1.5-pro', temperature: 0.6, user_message: 'Write a short, engaging Twitter post about the eco-friendly aspects of this product.' } },
+             // Branch A: Image + Text -> LLM #1
+             { id: 'img-product', type: 'uploadImage', position: { x: 50, y: 50 }, data: { label: 'Upload Product Photo' } },
+             { id: 'crop-product', type: 'cropImage', position: { x: 350, y: 50 }, data: { label: 'Crop Photo', cropX: 10, cropY: 10, cropW: 80, cropH: 80 } },
+             { id: 'txt-sys-desc', type: 'text', position: { x: 50, y: 250 }, data: { label: 'System Prompt', text: 'You are a professional marketing copywriter. Generate a compelling one-paragraph product description.' } },
+             { id: 'txt-user-desc', type: 'text', position: { x: 50, y: 400 }, data: { label: 'Product Details', text: 'Product: Wireless Bluetooth Headphones. Features: Noise cancellation, 30-hour battery, foldable design.' } },
+             { id: 'llm-desc', type: 'llm', position: { x: 700, y: 150 }, data: { label: 'Generate Description (LLM #1)', model: 'gemini-2.5-flash', temperature: 0.7 } },
+             
+             // Branch B: Video -> Extract Frame
+             { id: 'vid-product', type: 'uploadVideo', position: { x: 50, y: 650 }, data: { label: 'Upload Demo Video' } },
+             { id: 'ext-frame', type: 'extractFrame', position: { x: 350, y: 650 }, data: { label: 'Extract Frame from Video', timestamp: 50, timestampUnit: 'pct' } },
+
+             // Convergence: LLM #2
+             { id: 'txt-sys-post', type: 'text', position: { x: 700, y: 600 }, data: { label: 'System Promo', text: 'You are a social media manager. Create a tweet-length marketing post based on the product image and video frame.' } },
+             { id: 'llm-post', type: 'llm', position: { x: 1150, y: 350 }, data: { label: 'Final Marketing Summary (LLM #2)', model: 'gemini-2.5-flash', temperature: 0.8 } }
            ]);
            setEdges([
-             { id: 'e1', source: 'text-brand', target: 'llm-insta', sourceHandle: 'text', targetHandle: 'system_prompt', animated: true },
-             { id: 'e2', source: 'img-product', target: 'llm-insta', sourceHandle: 'image', targetHandle: 'images', animated: true },
-             { id: 'e3', source: 'text-brand', target: 'llm-tweet', sourceHandle: 'text', targetHandle: 'system_prompt', animated: true },
-             { id: 'e4', source: 'img-product', target: 'llm-tweet', sourceHandle: 'image', targetHandle: 'images', animated: true },
+             // Branch A edges
+             { id: 'e-img-crop', source: 'img-product', target: 'crop-product', sourceHandle: 'image', targetHandle: 'image', animated: true },
+             { id: 'e-sys-desc', source: 'txt-sys-desc', target: 'llm-desc', sourceHandle: 'text', targetHandle: 'system_prompt', animated: true },
+             { id: 'e-usr-desc', source: 'txt-user-desc', target: 'llm-desc', sourceHandle: 'text', targetHandle: 'user_message', animated: true },
+             { id: 'e-crop-desc', source: 'crop-product', target: 'llm-desc', sourceHandle: 'output', targetHandle: 'images', animated: true },
+
+             // Branch B edges
+             { id: 'e-vid-ext', source: 'vid-product', target: 'ext-frame', sourceHandle: 'video', targetHandle: 'video', animated: true },
+
+             // Convergence edges
+             { id: 'e-sys-post', source: 'txt-sys-post', target: 'llm-post', sourceHandle: 'text', targetHandle: 'system_prompt', animated: true },
+             { id: 'e-desc-post', source: 'llm-desc', target: 'llm-post', sourceHandle: 'output', targetHandle: 'user_message', animated: true },
+             { id: 'e-crop-post', source: 'crop-product', target: 'llm-post', sourceHandle: 'output', targetHandle: 'images', animated: true },
+             { id: 'e-ext-post', source: 'ext-frame', target: 'llm-post', sourceHandle: 'output', targetHandle: 'images', animated: true }
            ]);
         }
 

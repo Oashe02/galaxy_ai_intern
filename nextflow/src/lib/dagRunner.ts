@@ -106,58 +106,68 @@ export async function runDAG(
     const layers = getExecutionLayers(targetNodes, edges);
     const nodeResults: NodeResult[] = [];
 
-    for (const layer of layers) {
-        const layerPromises = layer.map(async (node) => {
-            const nodeStart = Date.now();
-            const nodeLabel = (node.data?.label as string) || node.type || node.id;
+    const promises = new Map<string, Promise<void>>();
 
-            if (SOURCE_TYPES.has(node.type ?? '')) {
-                store.setRunState(node.id, 'success');
-                store.pushLog({ nodeId: node.id, name: nodeLabel, status: 'success', ms: 0 });
-                nodeResults.push({
-                    nodeId: node.id,
-                    name: nodeLabel,
-                    status: 'success',
-                    ms: 0,
-                    output: (node.data?.text as string) || (node.data?.imageUrl as string) || (node.data?.videoUrl as string) || '',
-                });
-                return;
-            }
+    const executeNode = async (node: Node) => {
+        const nodeStart = Date.now();
+        const nodeLabel = (node.data?.label as string) || node.type || node.id;
 
-            if (EXECUTABLE_TYPES.has(node.type ?? '')) {
-                window.dispatchEvent(new CustomEvent('node:run', { detail: { id: node.id } }));
-                const finalState = await waitForNode(node.id);
-                const elapsed = Date.now() - nodeStart;
-
-                const updatedNode = useWorkflowStore.getState().nodes.find(n => n.id === node.id);
-                const output = (updatedNode?.data?.result as string) || '';
-
-                store.pushLog({
-                    nodeId: node.id,
-                    name: nodeLabel,
-                    status: finalState,
-                    ms: elapsed,
-                    out: finalState === 'success' ? output.substring(0, 200) : undefined,
-                    err: finalState === 'failed' ? output : undefined,
-                });
-
-                nodeResults.push({
-                    nodeId: node.id,
-                    name: nodeLabel,
-                    status: finalState,
-                    ms: elapsed,
-                    output: finalState === 'success' ? output : undefined,
-                    error: finalState === 'failed' ? output : undefined,
-                });
-                return;
-            }
-
+        if (SOURCE_TYPES.has(node.type ?? '')) {
             store.setRunState(node.id, 'success');
-            nodeResults.push({ nodeId: node.id, name: nodeLabel, status: 'success', ms: 0 });
-        });
+            store.pushLog({ nodeId: node.id, name: nodeLabel, status: 'success', ms: 0 });
+            nodeResults.push({
+                nodeId: node.id,
+                name: nodeLabel,
+                status: 'success',
+                ms: 0,
+                output: (node.data?.text as string) || (node.data?.imageUrl as string) || (node.data?.videoUrl as string) || '',
+            });
+            return;
+        }
 
-        await Promise.all(layerPromises);
+        if (EXECUTABLE_TYPES.has(node.type ?? '')) {
+            window.dispatchEvent(new CustomEvent('node:run', { detail: { id: node.id } }));
+            const finalState = await waitForNode(node.id);
+            const elapsed = Date.now() - nodeStart;
+
+            const updatedNode = useWorkflowStore.getState().nodes.find(n => n.id === node.id);
+            const output = (updatedNode?.data?.result as string) || '';
+
+            store.pushLog({
+                nodeId: node.id,
+                name: nodeLabel,
+                status: finalState,
+                ms: elapsed,
+                out: finalState === 'success' ? output.substring(0, 200) : undefined,
+                err: finalState === 'failed' ? output : undefined,
+            });
+
+            nodeResults.push({
+                nodeId: node.id,
+                name: nodeLabel,
+                status: finalState,
+                ms: elapsed,
+                output: finalState === 'success' ? output : undefined,
+                error: finalState === 'failed' ? output : undefined,
+            });
+            return;
+        }
+
+        store.setRunState(node.id, 'success');
+        nodeResults.push({ nodeId: node.id, name: nodeLabel, status: 'success', ms: 0 });
+    };
+    for (const layer of layers) {
+        for (const node of layer) {
+            const upstreams = edges
+                .filter(e => e.target === node.id)
+                .map(e => promises.get(e.source))
+                .filter(Boolean) as Promise<void>[];
+            const taskPromise = Promise.all(upstreams).then(() => executeNode(node));
+            promises.set(node.id, taskPromise);
+        }
     }
+
+    await Promise.all(targetNodes.map(n => promises.get(n.id)));
 
     const totalDuration = Date.now() - startTime;
     const anyFailed = nodeResults.some(r => r.status === 'failed');
@@ -176,9 +186,6 @@ export async function runDAG(
     };
 }
 
-/**
- * Record a completed run to the database.
- */
 export async function recordRunHistory(workflowId: string, result: DagRunResult) {
     try {
         await fetch('/api/history', {
