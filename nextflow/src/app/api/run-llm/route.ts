@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
         const { model, systemPrompt, userMessage, images, temperature } = body;
 
         if (!userMessage) {
-            return NextResponse.json({ error: "userMessage is required" }, { status: 400 });
+            return NextResponse.json({ error: "userMessage is required " }, { status: 400 });
         }
 
         const handle = await tasks.trigger<typeof runLLMTask>("run-llm", {
