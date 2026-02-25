@@ -421,12 +421,19 @@ export function CropImageNode({ id, data, selected }: any) {
       if (!srcNode) return;
       const val = srcNode.data.result || srcNode.data.imageUrl || srcNode.data.text;
       
-      if (e.targetHandle === 'image') imageUrl = val as string;
-      else if (e.targetHandle === 'x_percent') x = parseFloat(val as string) || x;
-      else if (e.targetHandle === 'y_percent') y = parseFloat(val as string) || y;
-      else if (e.targetHandle === 'width_percent') w = parseFloat(val as string) || w;
-      else if (e.targetHandle === 'height_percent') h = parseFloat(val as string) || h;
+      const target = e.targetHandle?.toLowerCase() || '';
+      if (target.includes('image')) imageUrl = val as string;
+      else if (target.includes('x')) x = parseFloat(val as string) || x;
+      else if (target.includes('y')) y = parseFloat(val as string) || y;
+      else if (target.includes('width') || target === 'w') w = parseFloat(val as string) || w;
+      else if (target.includes('height') || target === 'h') h = parseFloat(val as string) || h;
     });
+
+    if (!imageUrl) {
+        setRunState(id, 'failed');
+        updateNode(id, { result: 'Error: No input image found. Ensure a node is connected to the Image input.' });
+        return;
+    }
 
     try {
       const res = await fetch('/api/crop-image', {
@@ -621,9 +628,16 @@ export function ExtractFrameNode({ id, data, selected }: any) {
       if (!srcNode) return;
       const val = srcNode.data.result || srcNode.data.videoUrl || srcNode.data.text;
 
-      if (e.targetHandle === 'video') videoUrl = val as string;
-      else if (e.targetHandle === 'timestamp') timestamp = val as any;
+      const target = e.targetHandle?.toLowerCase() || '';
+      if (target.includes('video')) videoUrl = val as string;
+      else if (target.includes('time') || target === 'timestamp') timestamp = val as any;
     });
+
+    if (!videoUrl) {
+        setRunState(id, 'failed');
+        updateNode(id, { result: 'Error: No input video found. Ensure a node is connected to the Video input.' });
+        return;
+    }
 
     try {
       const res = await fetch('/api/extract-frame', {

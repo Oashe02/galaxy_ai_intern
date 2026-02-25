@@ -26,7 +26,7 @@ export const cropImageTask = task({
             if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`);
             buf = Buffer.from(await imgRes.arrayBuffer());
         } else {
-            throw new Error("Invalid image URL. Must be a data URL or HTTP URL.");
+            throw new Error("Invalid image URL.. Must be a data URL or HTTP URL.");
         }
 
         let sharp: typeof import("sharp");
