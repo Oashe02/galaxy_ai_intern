@@ -278,16 +278,22 @@ export function LLMNode({ id, data, selected }: any) {
 
       // poll for result
       const poll = setInterval(async () => {
-        const statusRes = await fetch(`/api/run-status?id=${runId}`);
-        const run = await statusRes.json();
-        if (run.status === 'COMPLETED') {
-          clearInterval(poll);
-          setRunState(id, 'success');
-          updateNode(id, { result: run.output?.text || 'Done' });
-        } else if (run.status === 'FAILED' || run.status === 'CRASHED') {
-          clearInterval(poll);
-          setRunState(id, 'failed');
-          updateNode(id, { result: run.error?.message || run.output?.error || 'Task failed' });
+        try {
+          const statusRes = await fetch(`/api/run-status?id=${runId}`);
+          const run = await statusRes.json();
+          const status = (run.status || '').toUpperCase();
+          
+          if (status === 'COMPLETED') {
+            clearInterval(poll);
+            setRunState(id, 'success');
+            updateNode(id, { result: run.output?.text || 'Done' });
+          } else if (['FAILED', 'CRASHED', 'TIMED_OUT', 'CANCELLED'].includes(status)) {
+            clearInterval(poll);
+            setRunState(id, 'failed');
+            updateNode(id, { result: run.error?.message || run.output?.error || `Task ${status.toLowerCase()}` });
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
         }
       }, 2000);
     } catch (err: any) {
@@ -480,18 +486,25 @@ export function CropImageNode({ id, data, selected }: any) {
 
       // poll for result
       const poll = setInterval(async () => {
-        const statusRes = await fetch(`/api/run-status?id=${runId}`);
-        const run = await statusRes.json();
-        if (run.status === 'COMPLETED') {
-          clearInterval(poll);
-          setRunState(id, 'success');
-          updateNode(id, { result: run.output?.dataUrl || 'Done' });
-        } else if (run.status === 'FAILED' || run.status === 'CRASHED') {
-          clearInterval(poll);
-          setRunState(id, 'failed');
-          updateNode(id, { result: run.error?.message || run.output?.error || 'Task failed' });
+        try {
+          const statusRes = await fetch(`/api/run-status?id=${runId}`);
+          const run = await statusRes.json();
+          const status = (run.status || '').toUpperCase();
+
+          if (status === 'COMPLETED') {
+            clearInterval(poll);
+            setRunState(id, 'success');
+            updateNode(id, { result: run.output?.dataUrl || 'Done' });
+          } else if (['FAILED', 'CRASHED', 'TIMED_OUT', 'CANCELLED'].includes(status)) {
+            clearInterval(poll);
+            setRunState(id, 'failed');
+            updateNode(id, { result: run.error?.message || run.output?.error || `Task ${status.toLowerCase()}` });
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
         }
       }, 2000);
+
     } catch (err: any) {
       setRunState(id, 'failed');
       updateNode(id, { result: err.message });
@@ -687,16 +700,22 @@ export function ExtractFrameNode({ id, data, selected }: any) {
 
       // poll for result
       const poll = setInterval(async () => {
-        const statusRes = await fetch(`/api/run-status?id=${runId}`);
-        const run = await statusRes.json();
-        if (run.status === 'COMPLETED') {
-          clearInterval(poll);
-          setRunState(id, 'success');
-          updateNode(id, { result: run.output?.dataUrl || 'Done' });
-        } else if (run.status === 'FAILED' || run.status === 'CRASHED') {
-          clearInterval(poll);
-          setRunState(id, 'failed');
-          updateNode(id, { result: run.error?.message || run.output?.error || 'Task failed' });
+        try {
+          const statusRes = await fetch(`/api/run-status?id=${runId}`);
+          const run = await statusRes.json();
+          const status = (run.status || '').toUpperCase();
+
+          if (status === 'COMPLETED') {
+            clearInterval(poll);
+            setRunState(id, 'success');
+            updateNode(id, { result: run.output?.dataUrl || 'Done' });
+          } else if (['FAILED', 'CRASHED', 'TIMED_OUT', 'CANCELLED'].includes(status)) {
+            clearInterval(poll);
+            setRunState(id, 'failed');
+            updateNode(id, { result: run.error?.message || run.output?.error || `Task ${status.toLowerCase()}` });
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
         }
       }, 2000);
     } catch (err: any) {

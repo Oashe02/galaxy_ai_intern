@@ -15,12 +15,15 @@ export const extractFrameTask = task({
 
         let ffmpeg: typeof import("fluent-ffmpeg");
         let ffmpegPath: string;
+        let ffprobePath: string;
         try {
             ffmpeg = (await import("fluent-ffmpeg")).default;
             ffmpegPath = (await import("ffmpeg-static")).default as string;
+            ffprobePath = (await import("ffprobe-static")).path;
             ffmpeg.setFfmpegPath(ffmpegPath);
+            ffmpeg.setFfprobePath(ffprobePath);
         } catch (err) {
-            throw new Error("FFmpeg setup failed — ensure fluent-ffmpeg and ffmpeg-static are installed.");
+            throw new Error("FFmpeg setup failed — ensure fluent-ffmpeg, ffmpeg-static, and ffprobe-static are installed.");
         }
 
         let seekSec = timestamp;

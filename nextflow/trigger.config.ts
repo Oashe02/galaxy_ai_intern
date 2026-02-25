@@ -16,6 +16,6 @@ export default defineConfig({
     },
     dirs: ["./src/trigger"],
     build: {
-        external: ["sharp", "ffmpeg-static"],
+        external: ["sharp", "ffmpeg-static", "ffprobe-static"],
     },
 });
