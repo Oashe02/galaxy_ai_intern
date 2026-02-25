@@ -226,13 +226,14 @@ export function LLMNode({ id, data, selected }: any) {
     incomingEdges.forEach((e) => {
       const srcNode = store.nodes.find((n) => n.id === e.source);
       if (!srcNode) return;
-      if (e.targetHandle === 'system_prompt') {
-        sysPrompt = (srcNode.data.result || srcNode.data.text || sysPrompt) as string;
-      } else if (e.targetHandle === 'user_message') {
-        userMsg = (srcNode.data.result || srcNode.data.text || userMsg) as string;
-      } else if (e.targetHandle === 'images') {
-        const img = (srcNode.data.result || srcNode.data.imageUrl) as string;
-        if (img) images.push(img);
+      
+      const val = (srcNode.data.result || srcNode.data.imageUrl || srcNode.data.videoUrl || srcNode.data.text || '') as string;
+      const target = e.targetHandle?.toLowerCase() || '';
+
+      if (target.includes('system')) sysPrompt = val;
+      else if (target.includes('user') || target.includes('message') || target === 'prompt') userMsg = val;
+      else if (target.includes('image')) {
+        if (val) images.push(val);
       }
     });
 
@@ -419,7 +420,7 @@ export function CropImageNode({ id, data, selected }: any) {
     incomingEdges.forEach((e) => {
       const srcNode = store.nodes.find((n) => n.id === e.source);
       if (!srcNode) return;
-      const val = srcNode.data.result || srcNode.data.imageUrl || srcNode.data.text;
+      const val = srcNode.data.result || srcNode.data.imageUrl || srcNode.data.videoUrl || srcNode.data.text;
       
       const target = e.targetHandle?.toLowerCase() || '';
       if (target.includes('image')) imageUrl = val as string;
@@ -431,7 +432,7 @@ export function CropImageNode({ id, data, selected }: any) {
 
     if (!imageUrl) {
         setRunState(id, 'failed');
-        updateNode(id, { result: 'Error: No input image found. Ensure a node is connected to the Image input.' });
+        updateNode(id, { result: 'Error: imageURL is required. Connect an image or node output.' });
         return;
     }
 
@@ -626,16 +627,16 @@ export function ExtractFrameNode({ id, data, selected }: any) {
     incomingEdges.forEach((e) => {
       const srcNode = store.nodes.find((n) => n.id === e.source);
       if (!srcNode) return;
-      const val = srcNode.data.result || srcNode.data.videoUrl || srcNode.data.text;
+      const val = srcNode.data.result || srcNode.data.videoUrl || srcNode.data.imageUrl || srcNode.data.text;
 
       const target = e.targetHandle?.toLowerCase() || '';
       if (target.includes('video')) videoUrl = val as string;
-      else if (target.includes('time') || target === 'timestamp') timestamp = val as any;
+      else if (target.includes('time') || target.includes('timestamp')) timestamp = val as any;
     });
 
     if (!videoUrl) {
         setRunState(id, 'failed');
-        updateNode(id, { result: 'Error: No input video found. Ensure a node is connected to the Video input.' });
+        updateNode(id, { result: 'Error: videoUrl is required. Connect a video node.' });
         return;
     }
 
