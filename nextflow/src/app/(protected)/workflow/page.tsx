@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import WorkflowCanvas from '@/components/canvas/WorkflowCanvas';
 import { useWorkflowStore, type LogEntry } from '@/store/useWorkflowStore';
+import { useSearchParams } from 'next/navigation';
 import { 
   Search, Play, History, Type, Image as ImageIcon, Video, Layers, Settings, 
   Crop, Share2, Plus, SlidersHorizontal, Maximize2, Sparkles, 
@@ -27,7 +28,7 @@ const NODE_TYPES = [
 type View = 'dashboard' | 'canvas';
 
 
-export default function WorkflowPage() {
+export function WorkflowContent() {
   const [view, setView] = useState<View>('dashboard');
   const [prompt, setPrompt] = useState('');
   const addNode = useWorkflowStore(s => s.addNode);
@@ -51,6 +52,26 @@ export default function WorkflowPage() {
   // Persistent history from DB
   const [dbHistory, setDbHistory] = useState<any[]>([]);
   const [expandedRun, setExpandedRun] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const initialPrompt = searchParams.get('prompt');
+  const [hasIngestedPrompt, setHasIngestedPrompt] = useState(false);
+
+  useEffect(() => {
+    if (initialPrompt && !hasIngestedPrompt) {
+      addNode({
+        id: `prompt-${Date.now()}`,
+        type: 'text',
+        position: { x: 400, y: 300 },
+        data: { 
+          text: initialPrompt, 
+          label: 'Prompt from Landing' 
+        }
+      });
+      setHasIngestedPrompt(true);
+      setView('canvas');
+    }
+  }, [initialPrompt, hasIngestedPrompt, addNode]);
 
   // Load existing workflow + history on mount
   useEffect(() => {
@@ -693,6 +714,16 @@ function FeatureItem({ icon, label, color, badge, onClick }: { icon: React.React
       </div>
       <span className="text-sm text-zinc-300 group-hover:text-white transition-colors font-medium">{label}</span>
     </button>
+  );
+}
+
+export default function WorkflowPage() {
+  return (
+    <ReactFlowProvider>
+      <Suspense fallback={<div className="flex h-screen items-center justify-center bg-black"><Loader2 className="animate-spin text-purple-500 w-10 h-10" /></div>}>
+        <WorkflowContent />
+      </Suspense>
+    </ReactFlowProvider>
   );
 }
 

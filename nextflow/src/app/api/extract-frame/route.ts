@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
         const handle = await tasks.trigger<typeof extractFrameTask>("extract-frame", {
             videoUrl,
             timestamp: timestamp ?? 0,
-            unit: unit ?? "sec",
+            timestampUnit: unit ?? "sec",
         });
 
         return NextResponse.json({ id: handle.id, status: "triggered" });
